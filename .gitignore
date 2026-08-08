@@ -2,18 +2,39 @@
 node_modules/
 .pnp
 .pnp.js
+*.tgz
 
 # ---- build output ----
 dist/
 build/
 *.tsbuildinfo
 
-# ---- environment ----
-.env
-.env.local
-.env.*.local
-.env.test
+# ---- environment & secrets ----
+# Deny-all, then allow only the templates. This catches .env.production,
+# .env.docker, .env.local.bak and anything else added later.
+.env*
 !.env.example
+!.env*.example
+
+# credentials, keys, certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+secrets/
+*.credentials.json
+service-account*.json
+
+# ---- database artefacts ----
+# dumps can contain real applicant data — never commit them
+*.sql.gz
+*.dump
+dump.sql
+*.sqlite
+*.sqlite3
+*.db
 
 # ---- logs ----
 logs/
@@ -27,15 +48,25 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+test-results/
+playwright-report/
 
 # ---- prisma ----
-# generated client only (migrations MUST be committed)
+# Generated client. Schema output is "../generated/prisma" relative to
+# src/prisma/, so the real path is src/generated/prisma.
+generated/prisma/
+src/generated/
 prisma/generated/
+# Migrations MUST be committed — CI runs `prisma migrate deploy`.
+!src/prisma/migrations/
+!src/prisma/migrations/**
 
-# ---- vite / react client ----
+# ---- vite / react client (day 4) ----
 web/dist/
 web/.vite/
 .vite/
+.turbo/
+.eslintcache
 
 # ---- docker local state ----
 # only if you bind-mount volumes into the repo
