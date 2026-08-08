@@ -1,0 +1,57 @@
+# ---- dependencies ----
+node_modules/
+.pnp
+.pnp.js
+
+# ---- build output ----
+dist/
+build/
+*.tsbuildinfo
+
+# ---- environment ----
+.env
+.env.local
+.env.*.local
+.env.test
+!.env.example
+
+# ---- logs ----
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- testing ----
+coverage/
+.nyc_output/
+*.lcov
+
+# ---- prisma ----
+# generated client only (migrations MUST be committed)
+prisma/generated/
+
+# ---- vite / react client ----
+web/dist/
+web/.vite/
+.vite/
+
+# ---- docker local state ----
+# only if you bind-mount volumes into the repo
+pgdata/
+rabbitmq-data/
+
+# ---- editor & os ----
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# ---- misc ----
+.cache/
+tmp/

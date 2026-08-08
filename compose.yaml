@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: [POSTGRES_PASSWORD=devpass, POSTGRES_DB=loans]
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports: ["5672:5672", "15672:15672"]
