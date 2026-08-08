@@ -48,7 +48,7 @@ export class AppError extends Error {
   }
 
   static forbidden(
-    message: "You do not have access to this resource",
+    message = "You do not have access to this resource",
     details?: unknown,
   ) {
     return new AppError(message, {
@@ -61,7 +61,7 @@ export class AppError extends Error {
   static conflict(message = "Resource already exists", details?: unknown) {
     return new AppError(message, {
       statusCode: 409,
-      code: "FORBIDDEN",
+      code: "CONFLICT",
       details,
     });
   }
