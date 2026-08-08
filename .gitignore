@@ -55,3 +55,9 @@ desktop.ini
 # ---- misc ----
 .cache/
 tmp/
+
+# ---- agent/skill tooling ----
+.claude/
+.agents/
+.windsurf/
+skills-lock.json
