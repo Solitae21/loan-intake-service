@@ -8,6 +8,40 @@ import {
 import { prisma } from "../../infra/prisma.js";
 import { AppError } from "../../api/errors.js";
 import { Prisma } from "../../generated/prisma/client.js";
+import { logger } from "../../infra/logger.js";
+import {
+  ACCESS_TTL_SECONDS,
+  generateRefreshToken,
+  hashRefreshToken,
+  signAccessToken,
+} from "../../infra/tokens.js";
+import type { Role } from "../../generated/prisma/enums.js";
+
+type TokenSubject = { id: string; role: Role };
+
+const issueTokens = async (user: TokenSubject) => {
+  const { token, tokenHash, expiresAt } = generateRefreshToken();
+
+  await prisma.refreshToken.create({
+    data: { tokenHash, userId: user.id, expiresAt },
+  });
+
+  return {
+    accessToken: signAccessToken(user),
+    refreshToken: token,
+    tokenType: "Bearer" as const,
+    expiresAt: ACCESS_TTL_SECONDS,
+  };
+};
+
+const revokeAllForUser = (userId: string) =>
+  prisma.refreshToken.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+    },
+    data: { revokedAt: new Date() },
+  });
 
 export const register = async (input: Credentials) => {
   const passwordHash = await hashPassword(input.password);
@@ -50,5 +84,49 @@ export const login = async (input: Credentials) => {
   }
 
   const { passwordHash: _, ...safe } = user;
-  return safe;
+  return { user: safe, tokens: await issueTokens(user) };
+};
+
+export const refresh = async (presented: string) => {
+  const tokenHash = hashRefreshToken(presented);
+
+  const stored = await prisma.refreshToken.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  });
+
+  if (!stored) {
+    throw AppError.unauthorized("Invalid refresh token");
+  }
+
+  if (stored.revokedAt) {
+    await revokeAllForUser(stored.userId);
+    logger.warn(
+      { userId: stored.userId, tokenId: stored.id },
+      "refresh token reuse detected, revoked all sessions",
+    );
+    throw AppError.unauthorized("Invalid refresh token");
+  }
+
+  if (stored.expiresAt <= new Date()) {
+    throw AppError.unauthorized("Refresh token expired");
+  }
+
+  const claimed = await prisma.refreshToken.updateMany({
+    where: { id: stored.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  if (claimed.count === 0) {
+    throw AppError.unauthorized("Invalid refresh token");
+  }
+
+  return issueTokens(stored.user);
+};
+
+export const logout = async (presented: string) => {
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash: hashRefreshToken(presented), revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
 };

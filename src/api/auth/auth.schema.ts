@@ -6,3 +6,9 @@ export const credentialsSchema = z.object({
 });
 
 export type Credentials = z.infer<typeof credentialsSchema>;
+
+export const refreshSchema = z.object({
+  refreshToken: z.string().length(64),
+});
+
+export type RefreshInput = z.infer<typeof refreshSchema>;
