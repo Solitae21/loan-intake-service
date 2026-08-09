@@ -74,4 +74,6 @@ model RefreshToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   revokedAt DateTime?
+
+  @@index([userId, revokedAt])
 }
