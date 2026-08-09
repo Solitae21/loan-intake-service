@@ -6,6 +6,7 @@ import { requestId } from "./middleware/request-id.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { pinoHttp } from "pino-http";
 import { logger } from "../infra/logger.js";
+import { authRouter } from "./auth/auth.routes.js";
 
 export const app = express();
 
@@ -13,6 +14,8 @@ app.use(requestId);
 app.use(pinoHttp({ logger, genReqId: (req) => req.id }));
 app.use(helmet());
 app.use(cors());
+
+app.use("/auth", authRouter);
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/health", (_req: Request, res: Response) => {

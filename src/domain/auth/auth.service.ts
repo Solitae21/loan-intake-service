@@ -1,14 +1,13 @@
-import { email } from "zod";
 import type { Credentials } from "../../api/auth/auth.schema.js";
 import {
   burnTiming,
   hashPassword,
   verifyPassword,
+  needsRehash,
 } from "../../infra/password.js";
 import { prisma } from "../../infra/prisma.js";
 import { AppError } from "../../api/errors.js";
 import { Prisma } from "../../generated/prisma/client.js";
-import { needsRehash } from "argon2";
 
 export const register = async (input: Credentials) => {
   const passwordHash = await hashPassword(input.password);

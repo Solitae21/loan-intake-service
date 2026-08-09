@@ -37,17 +37,6 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
 
   const appError = normalize(err);
 
-  const log = {
-    requestId: req.id,
-    method: req.method,
-    path: req.originalUrl,
-    statusCode: appError.statusCode,
-    code: appError.code,
-    message: appError.message,
-    stack: appError.stack,
-    cause: appError.cause,
-  };
-
   if (appError.statusCode >= 500)
     req.log.error({ err: appError, code: appError.code }, appError.message);
   else req.log.warn({ code: appError.code }, appError.message);
