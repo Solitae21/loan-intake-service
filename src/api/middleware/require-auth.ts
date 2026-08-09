@@ -3,14 +3,6 @@ import { AppError } from "../errors.js";
 import { verifyAccessToken, type AccessPayload } from "../../infra/tokens.js";
 import type { Role } from "../../generated/prisma/enums.js";
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AccessPayload;
-    }
-  }
-}
-
 export const requireAuth: RequestHandler = (req, _res, next) => {
   const header = req.get("authorization");
   if (!header?.startsWith("Bearer ")) {
