@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { AppError } from "../errors.js";
-import { verifyAccessToken, type AccessPayload } from "../../infra/tokens.js";
+import { verifyAccessToken } from "../../infra/tokens.js";
 import type { Role } from "../../generated/prisma/enums.js";
 
 export const requireAuth: RequestHandler = (req, _res, next) => {
