@@ -45,6 +45,7 @@ model Application {
   amount        Decimal           @db.Decimal(12, 2)
   term          Int
   monthlyIncome Decimal           @db.Decimal(12, 2)
+  purpose       String            @db.VarChar(140)
   status        ApplicationStatus @default(PENDING)
   score         Int?
   decidedAt     DateTime?

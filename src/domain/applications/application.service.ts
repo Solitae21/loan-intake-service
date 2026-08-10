@@ -17,6 +17,7 @@ const toResponse = (row: Application) => ({
   amount: row.amount.toFixed(2),
   term: row.term,
   monthlyIncome: row.monthlyIncome.toFixed(2),
+  purpose: row.purpose,
   status: row.status,
   score: row.score,
   decidedAt: row.decidedAt,
@@ -33,6 +34,7 @@ export const createApplicationService = (repo: ApplicationRepository) => ({
       amount: input.amount.toFixed(2),
       term: input.term,
       monthlyIncome: input.monthlyIncome.toFixed(2),
+      purpose: input.purpose,
     });
 
     return toResponse(row);

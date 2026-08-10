@@ -8,6 +8,7 @@ export type CreateApplicationData = {
   amount: string;
   term: number;
   monthlyIncome: string;
+  purpose: string;
 };
 
 export type ApplicationFilter = {

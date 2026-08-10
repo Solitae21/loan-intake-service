@@ -8,6 +8,7 @@ export const createApplicationSchema = z.object({
   amount: money,
   term: z.number().int().min(6).max(360),
   monthlyIncome: money,
+  purpose: z.string().trim().min(3).max(140),
 });
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
