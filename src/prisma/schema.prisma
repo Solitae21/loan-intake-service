@@ -78,3 +78,17 @@ model RefreshToken {
 
   @@index([userId, revokedAt])
 }
+
+model OutboxMessage {
+  id          String    @id @default(uuid())
+  exchange    String
+  routingKey  String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  availableAt DateTime  @default(now())
+  publishedAt DateTime?
+  attempts    Int       @default(0)
+  lastError   String?
+
+  @@index([publishedAt, availableAt])
+}

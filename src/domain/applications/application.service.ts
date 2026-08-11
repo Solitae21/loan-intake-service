@@ -10,6 +10,10 @@ import {
   type ApplicationFilter,
   type ApplicationRepository,
 } from "../../infra/repositories/application.repository.js";
+import { LOANS_EXCHANGE } from "../../infra/messaging/rabbit.js";
+import { notifyOutbox } from "../../infra/messaging/outbox-relay.js";
+
+export const APPLICATION_SUBMITTED = "application.submitted";
 
 const toResponse = (row: Application) => ({
   id: row.id,
@@ -29,14 +33,25 @@ const seesEveryApplication = (actor: AccessPayload): boolean =>
 
 export const createApplicationService = (repo: ApplicationRepository) => ({
   submit: async (actor: AccessPayload, input: CreateApplicationInput) => {
-    const row = await repo.create({
-      applicantId: actor.sub,
-      amount: input.amount.toFixed(2),
-      term: input.term,
-      monthlyIncome: input.monthlyIncome.toFixed(2),
-      purpose: input.purpose,
-    });
+    const row = await repo.createWithOutbox(
+      {
+        applicantId: actor.sub,
+        amount: input.amount.toFixed(2),
+        term: input.term,
+        monthlyIncome: input.monthlyIncome.toFixed(2),
+        purpose: input.purpose,
+      },
+      (application) => ({
+        exchange: LOANS_EXCHANGE,
+        routingKey: APPLICATION_SUBMITTED,
+        payload: {
+          applicationId: application.id,
+          occuredAt: application.createdAt.toISOString(),
+        },
+      }),
+    );
 
+    notifyOutbox();
     return toResponse(row);
   },
 

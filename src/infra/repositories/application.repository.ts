@@ -3,6 +3,12 @@ import type { Application } from "../../generated/prisma/client.js";
 import type { ApplicationStatus } from "../../generated/prisma/enums.js";
 import { prisma } from "../prisma.js";
 
+export type OutboxDraft = {
+  exchange: string;
+  routingKey: string;
+  payload: Prisma.InputJsonValue;
+};
+
 export type CreateApplicationData = {
   applicantId: string;
   amount: string;
@@ -74,8 +80,22 @@ const updateStatus = (
   return prisma.application.update({ where: { id }, data });
 };
 
+const createWithOutbox = (
+  data: CreateApplicationData,
+  event: (row: Application) => OutboxDraft,
+): Promise<Application> =>
+  prisma.$transaction(async (tx) => {
+    const row = await tx.application.create({ data });
+    await tx.outboxMessage.create({ data: event(row) });
+    return row;
+  });
+
 export type ApplicationRepository = {
   create(data: CreateApplicationData): Promise<Application>;
+  createWithOutbox(
+    data: CreateApplicationData,
+    event: (row: Application) => OutboxDraft,
+  ): Promise<Application>;
   findById(id: string): Promise<Application | null>;
   list(
     filter: ApplicationFilter,
@@ -86,6 +106,7 @@ export type ApplicationRepository = {
 
 export const applicationRepository: ApplicationRepository = {
   create,
+  createWithOutbox,
   findById,
   list,
   updateStatus,
