@@ -14,7 +14,7 @@ export const app = express();
 app.use(requestId);
 app.use(pinoHttp({ logger, genReqId: (req) => req.id }));
 app.use(helmet());
-app.use(cors());
+app.use(cors({ exposedHeaders: ["Location"] }));
 app.use(express.json({ limit: "100kb" }));
 
 app.use("/auth", authRouter);

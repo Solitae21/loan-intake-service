@@ -10,7 +10,9 @@
     "prisma": "prisma --config src/prisma.config.ts",
     "prisma:format": "prisma format --config src/prisma.config.ts",
     "migrate": "prisma migrate dev --config src/prisma.config.ts",
-    "generate": "prisma generate --config src/prisma.config.ts"
+    "generate": "prisma generate --config src/prisma.config.ts",
+    "worker": "tsx src/worker/index.ts",
+    "worker:dev": "tsx watch src/worker/index.ts"
   },
   "keywords": [],
   "author": "",

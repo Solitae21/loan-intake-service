@@ -2,11 +2,13 @@ import {
   connect,
   type ConfirmChannel,
   type RecoveringChannelModel,
+  type Channel,
 } from "amqplib";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 
 export const LOANS_EXCHANGE = "loans";
+export const LOANS_DLX = "loans.dlx";
 
 export type OutgoingMessage = {
   exchange: string;
@@ -18,6 +20,15 @@ export type OutgoingMessage = {
 
 let model: RecoveringChannelModel | null = null;
 let channel: Promise<ConfirmChannel> | null = null;
+
+export const createChannel = async (): Promise<Channel> => {
+  if (!model)
+    throw new Error("RabbitMQ not connected - call connectRabbit() first");
+
+  const ch = await model.createChannel();
+  await ch.assertExchange(LOANS_EXCHANGE, "topic", { durable: true });
+  return ch;
+};
 
 const openChannel = async (): Promise<ConfirmChannel> => {
   if (!model)
