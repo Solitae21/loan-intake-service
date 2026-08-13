@@ -5,6 +5,9 @@ import { APPLICATION_SUBMITTED } from "../domain/applications/application.servic
 export const SCORING_QUEUE = "application.scoring";
 export const SCORING_DLQ = "application.scoring.dlq";
 
+export const RETRY_HEADER = "x-retry-count";
+export const MAX_ATTEMPTS = 3;
+
 export const assertScoringTopology = async (
   channel: Channel,
 ): Promise<void> => {
