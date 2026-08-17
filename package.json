@@ -12,7 +12,8 @@
     "migrate": "prisma migrate dev --config src/prisma.config.ts",
     "generate": "prisma generate --config src/prisma.config.ts",
     "worker": "tsx src/worker/index.ts",
-    "worker:dev": "tsx watch src/worker/index.ts"
+    "worker:dev": "tsx watch src/worker/index.ts",
+    "replay": "tsx src/scripts/replay-event.ts"
   },
   "keywords": [],
   "author": "",

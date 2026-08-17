@@ -2,52 +2,73 @@ import { z } from "zod";
 import { logger } from "../../infra/logger.js";
 import { applicationRepository } from "../../infra/repositories/application.repository.js";
 import { scoreApplication } from "../../domain/applications/scoring.js";
+import { APPLICATION_SUBMITTED } from "../../domain/applications/application.service.js";
 import { config } from "../../infra/config.js";
 
-const log = logger.child({ handler: "application.submitted" });
+const log = logger.child({ handler: APPLICATION_SUBMITTED });
 
 const submittedEvent = z.object({
   applicationId: z.string(),
   occuredAt: z.string(),
 });
 
-export const handleSubmitted = async (raw: unknown): Promise<void> => {
+export const handleSubmitted = async (
+  messageId: string,
+  raw: unknown,
+): Promise<void> => {
   const event = submittedEvent.parse(raw);
 
   if (config.FORCE_SCORING_FAILURE) {
     throw new Error("forced scoring failure");
   }
 
-  const application = await applicationRepository.findById(event.applicationId);
+  const applicationId = event.applicationId;
 
-  if (!application) {
-    log.warn(
-      { applicationId: event.applicationId },
-      "application not found - dropping",
-    );
-    return;
+  const result = await applicationRepository.decideOnce(
+    { messageId, eventType: APPLICATION_SUBMITTED, applicationId },
+    (application) => {
+      const { score, status } = scoreApplication({
+        amount: application.amount.toNumber(),
+        term: application.term,
+        monthlyIncome: application.monthlyIncome.toNumber(),
+      });
+
+      return {
+        status,
+        score,
+        ...(status === "NEEDS_REVIEW" ? {} : { decidedAt: new Date() }),
+      };
+    },
+  );
+
+  switch (result.outcome) {
+    case "DECIDED":
+      log.info({ messageId, applicationId }, "application scored");
+      return;
+
+    case "DUPLICATE":
+      log.info(
+        { messageId, applicationId },
+        "event already processed - skipping",
+      );
+      return;
+
+    case "ALREADY_DECIDED":
+      log.info(
+        { messageId, applicationId, status: result.status },
+        "application no longer pending - skipping",
+      );
+      return;
+
+    case "LOST_RACE":
+      log.info({ messageId, applicationId }, "decided concurrently - skipping");
+      return;
+
+    case "NOT_FOUND":
+      log.warn(
+        { messageId, applicationId },
+        "application not found - dropping",
+      );
+      return;
   }
-
-  if (application.status !== "PENDING") {
-    log.info(
-      {
-        applicationId: application.id,
-        status: application.status,
-      },
-      "already processed - skipping",
-    );
-    return;
-  }
-
-  const { score, status } = scoreApplication({
-    amount: application.amount.toNumber(),
-    term: application.term,
-    monthlyIncome: application.monthlyIncome.toNumber(),
-  });
-
-  await applicationRepository.updateStatus(application.id, {
-    status,
-    score,
-    ...(status === "NEEDS_REVIEW" ? {} : { decidedAt: new Date() }),
-  });
 };

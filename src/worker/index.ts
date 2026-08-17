@@ -59,8 +59,14 @@ const onMessage = async (msg: ConsumeMessage): Promise<void> => {
   const messageId = msg.properties.messageId;
   const attempts = priorAttempts(msg) + 1;
 
+  if (!messageId) {
+    log.error("message has no messageId - cannot dedupe, dead lettering");
+    settle(() => channel.nack(msg, false, false));
+    return;
+  }
+
   try {
-    await handleSubmitted(JSON.parse(msg.content.toString()));
+    await handleSubmitted(messageId, JSON.parse(msg.content.toString()));
     settle(() => channel.ack(msg));
   } catch (err) {
     if (isPermanent(err)) {
