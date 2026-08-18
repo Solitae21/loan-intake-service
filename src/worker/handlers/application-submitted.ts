@@ -27,11 +27,14 @@ export const handleSubmitted = async (
   const result = await applicationRepository.decideOnce(
     { messageId, eventType: APPLICATION_SUBMITTED, applicationId },
     (application) => {
-      const { score, status } = scoreApplication({
+      const { score, status, breakdown } = scoreApplication({
         amount: application.amount.toNumber(),
         term: application.term,
         monthlyIncome: application.monthlyIncome.toNumber(),
+        purpose: application.purpose,
       });
+
+      log.debug({ applicationId, score, status, breakdown }, "score breakdown");
 
       return {
         status,

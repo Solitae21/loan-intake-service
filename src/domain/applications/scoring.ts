@@ -1,37 +1,47 @@
 import type { ApplicationStatus } from "../../generated/prisma/enums.js";
+import { rules } from "./scoring.rules.js";
+import type {
+  Rule,
+  RuleResult,
+  ScoreInput,
+  ScoreResult,
+} from "./scoring.types.js";
 
-export type ScoreInput = {
-  amount: number;
-  term: number;
-  monthlyIncome: number;
-};
+export type { Rule, RuleResult, ScoreInput, ScoreResult };
 
-export type ScoreResult = {
-  score: number;
-  status: ApplicationStatus;
-};
+const BASE_SCORE = 50;
+const APPROVE_AT = 70;
+const REVIEW_AT = 40;
 
 export const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
-export const scoreApplication = ({
-  amount,
-  term,
-  monthlyIncome,
-}: ScoreInput): ScoreResult => {
-  if (monthlyIncome <= 0) return { score: 0, status: "REJECTED" };
+const toStatus = (score: number): ApplicationStatus =>
+  score >= APPROVE_AT
+    ? "APPROVED"
+    : score >= REVIEW_AT
+      ? "NEEDS_REVIEW"
+      : "REJECTED";
 
-  const monthlyPayment = amount / term;
-  const debtToIncome = monthlyPayment / monthlyIncome;
+export const evaluate = (
+  application: ScoreInput,
+  applied: Rule[] = rules,
+): ScoreResult => {
+  const breakdown = applied.map((rule) => rule(application));
+  const total = breakdown.reduce((sum, { points }) => sum + points, BASE_SCORE);
+  const score = clamp(total, 0, 100);
 
-  const base = Math.round((1 - debtToIncome / 0.5) * 100);
-  const sizePenalty = amount > monthlyIncome * 12 ? 15 : 0;
-  const termPenalty = term > 60 ? 10 : 0;
+  return { score, status: toStatus(score), breakdown };
+};
 
-  const score = clamp(base - sizePenalty - termPenalty, 0, 100);
+export const scoreApplication = (application: ScoreInput): ScoreResult => {
+  if (application.monthlyIncome <= 0) {
+    return {
+      score: 0,
+      status: "REJECTED",
+      breakdown: [{ points: 0, reason: "no declared income" }],
+    };
+  }
 
-  const status: ApplicationStatus =
-    score >= 70 ? "APPROVED" : score >= 40 ? "NEEDS_REVIEW" : "REJECTED";
-
-  return { score, status };
+  return evaluate(application);
 };
