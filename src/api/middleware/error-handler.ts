@@ -2,6 +2,7 @@ import z, { ZodError } from "zod";
 import { AppError, isAppError } from "../errors.js";
 import { config } from "../../infra/config.js";
 import type { ErrorRequestHandler, RequestHandler } from "express";
+import { InvalidTransitionError } from "../../domain/applications/application-state.js";
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
   next(AppError.notFound(`Cannot ${req.method} ${req.path}`));
@@ -9,6 +10,13 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 
 function normalize(err: unknown): AppError {
   if (isAppError(err)) return err;
+
+  if (err instanceof InvalidTransitionError) {
+    return AppError.conflict(err.message, {
+      from: err.from,
+      to: err.to,
+    });
+  }
 
   if (err instanceof ZodError) {
     return AppError.validation(

@@ -2,6 +2,7 @@ import { Prisma } from "../../generated/prisma/client.js";
 import type { Application } from "../../generated/prisma/client.js";
 import type { ApplicationStatus } from "../../generated/prisma/enums.js";
 import { prisma } from "../prisma.js";
+import { assertTransition } from "../../domain/applications/application-state.js";
 
 export type OutboxDraft = {
   exchange: string;
@@ -105,10 +106,30 @@ const updateStatus = (
   id: string,
   changes: StatusChange,
 ): Promise<Application> => {
-  const data: Prisma.ApplicationUpdateInput = { status: changes.status };
-  if (changes.score !== undefined) data.score = changes.score;
-  if (changes.decidedAt !== undefined) data.decidedAt = changes.decidedAt;
-  return prisma.application.update({ where: { id }, data });
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.application.findUniqueOrThrow({
+      where: { id },
+    });
+
+    assertTransition(current.status, changes.status);
+
+    const data: Prisma.ApplicationUpdateInput = {
+      status: changes.status,
+    };
+
+    if (changes.score !== undefined) {
+      data.score = changes.score;
+    }
+
+    if (changes.decidedAt !== undefined) {
+      data.decidedAt = changes.decidedAt;
+    }
+
+    return tx.application.update({
+      where: { id },
+      data,
+    });
+  });
 };
 
 const createWithOutbox = (
@@ -141,9 +162,16 @@ const decideOnce = async (
         return { outcome: "ALREADY_DECIDED", status: row.status };
       }
 
+      const changes = decide(row);
+
+      assertTransition(row.status, changes.status);
+
       const { count } = await tx.application.updateMany({
-        where: { id: row.id, status: "PENDING" },
-        data: toMutation(decide(row)),
+        where: {
+          id: row.id,
+          status: row.status,
+        },
+        data: toMutation(changes),
       });
 
       return count === 1 ? { outcome: "DECIDED" } : { outcome: "LOST_RACE" };
