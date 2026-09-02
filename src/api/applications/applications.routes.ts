@@ -6,6 +6,7 @@ import { idParamSchema } from "../schemas/common.js";
 import {
   createApplicationSchema,
   listApplicationsQuerySchema,
+  updateApplicationStatusSchema,
 } from "./application.schema.js";
 import { applicationService } from "../../domain/applications/application.service.js";
 import type { AccessPayload } from "../../infra/tokens.js";
@@ -44,5 +45,22 @@ applicationRouter.get(
   validate({ params: idParamSchema }),
   async (req, res) => {
     res.json(await applicationService.getById(actorOf(req), req.params.id));
+  },
+);
+
+applicationRouter.patch(
+  "/:id/status",
+  validate({
+    params: idParamSchema,
+    body: updateApplicationStatusSchema,
+  }),
+  async (req, res) => {
+    const application = await applicationService.transitionStatus(
+      actorOf(req),
+      req.params.id,
+      req.body,
+    );
+
+    res.json(application);
   },
 );

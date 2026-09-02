@@ -2,6 +2,7 @@ import { AppError } from "../../api/errors.js";
 import type {
   CreateApplicationInput,
   ListApplicationsQuery,
+  UpdateApplicationStatusInput,
 } from "../../api/applications/application.schema.js";
 import type { Application } from "../../generated/prisma/client.js";
 import type { AccessPayload } from "../../infra/tokens.js";
@@ -83,6 +84,41 @@ export const createApplicationService = (repo: ApplicationRepository) => ({
     }
 
     return toResponse(row);
+  },
+
+  transitionStatus: async (
+    actor: AccessPayload,
+    id: string,
+    input: UpdateApplicationStatusInput,
+  ) => {
+    if (actor.role === "APPLICANT") {
+      throw AppError.forbidden(
+        "Only officers and administrators can change application status",
+      );
+    }
+
+    const application = await repo.findById(id);
+
+    if (!application) {
+      throw AppError.notFound("Application not found");
+    }
+
+    const isFinalStatus =
+      input.status === "APPROVED" || input.status === "REJECTED";
+
+    const updated = await repo.updateStatus(
+      id,
+      {
+        status: input.status,
+        ...(isFinalStatus ? { decidedAt: new Date() } : {}),
+      },
+      {
+        actorId: actor.sub,
+        reason: input.reason,
+      },
+    );
+
+    return toResponse(updated);
   },
 });
 

@@ -1,11 +1,13 @@
 import { z } from "zod";
+import { APPLICATION_SUBMITTED } from "../../domain/applications/application.service.js";
+import { scoreApplication } from "../../domain/applications/scoring.js";
+import { config } from "../../infra/config.js";
 import { logger } from "../../infra/logger.js";
 import { applicationRepository } from "../../infra/repositories/application.repository.js";
-import { scoreApplication } from "../../domain/applications/scoring.js";
-import { APPLICATION_SUBMITTED } from "../../domain/applications/application.service.js";
-import { config } from "../../infra/config.js";
 
 const log = logger.child({ handler: APPLICATION_SUBMITTED });
+
+const SCORING_WORKER_ACTOR_ID = "worker:application-scoring";
 
 const submittedEvent = z.object({
   applicationId: z.string(),
@@ -25,7 +27,12 @@ export const handleSubmitted = async (
   const applicationId = event.applicationId;
 
   const result = await applicationRepository.decideOnce(
-    { messageId, eventType: APPLICATION_SUBMITTED, applicationId },
+    {
+      messageId,
+      eventType: APPLICATION_SUBMITTED,
+      applicationId,
+      actorId: SCORING_WORKER_ACTOR_ID,
+    },
     (application) => {
       const { score, status, breakdown } = scoreApplication({
         amount: application.amount.toNumber(),
@@ -34,19 +41,41 @@ export const handleSubmitted = async (
         purpose: application.purpose,
       });
 
-      log.debug({ applicationId, score, status, breakdown }, "score breakdown");
+      log.debug(
+        {
+          applicationId,
+          score,
+          status,
+          breakdown,
+        },
+        "score breakdown",
+      );
+
+      const reason = [
+        `Automated scoring produced score ${score}.`,
+        ...breakdown.map(
+          (item) =>
+            `${item.points >= 0 ? "+" : ""}${item.points}: ${item.reason}`,
+        ),
+      ].join(" ");
 
       return {
         status,
         score,
-        ...(status === "NEEDS_REVIEW" ? {} : { decidedAt: new Date() }),
+        reason,
+        ...(status === "NEEDS_REVIEW"
+          ? {}
+          : { decidedAt: new Date() }),
       };
     },
   );
 
   switch (result.outcome) {
     case "DECIDED":
-      log.info({ messageId, applicationId }, "application scored");
+      log.info(
+        { messageId, applicationId },
+        "application scored",
+      );
       return;
 
     case "DUPLICATE":
@@ -58,13 +87,20 @@ export const handleSubmitted = async (
 
     case "ALREADY_DECIDED":
       log.info(
-        { messageId, applicationId, status: result.status },
+        {
+          messageId,
+          applicationId,
+          status: result.status,
+        },
         "application no longer pending - skipping",
       );
       return;
 
     case "LOST_RACE":
-      log.info({ messageId, applicationId }, "decided concurrently - skipping");
+      log.info(
+        { messageId, applicationId },
+        "decided concurrently - skipping",
+      );
       return;
 
     case "NOT_FOUND":

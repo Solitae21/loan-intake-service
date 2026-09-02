@@ -1,8 +1,8 @@
 import { Prisma } from "../../generated/prisma/client.js";
 import type { Application } from "../../generated/prisma/client.js";
 import type { ApplicationStatus } from "../../generated/prisma/enums.js";
-import { prisma } from "../prisma.js";
 import { assertTransition } from "../../domain/applications/application-state.js";
+import { prisma } from "../prisma.js";
 
 export type OutboxDraft = {
   exchange: string;
@@ -39,10 +39,20 @@ export type StatusChange = {
   decidedAt?: Date;
 };
 
+export type AuditContext = {
+  actorId: string;
+  reason: string;
+};
+
+export type Decision = StatusChange & {
+  reason: string;
+};
+
 export type EventClaim = {
   messageId: string;
   eventType: string;
   applicationId: string;
+  actorId: string;
 };
 
 export type DecisionResult =
@@ -54,14 +64,23 @@ export type DecisionResult =
 
 const UNIQUE_VIOLATION = "P2002";
 
-const isDuplicateClaim = (err: unknown): boolean =>
-  err instanceof Prisma.PrismaClientKnownRequestError &&
-  err.code === UNIQUE_VIOLATION;
+const isDuplicateClaim = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === UNIQUE_VIOLATION;
 
-const toWhere = (filter: ApplicationFilter): Prisma.ApplicationWhereInput => {
+const toWhere = (
+  filter: ApplicationFilter,
+): Prisma.ApplicationWhereInput => {
   const where: Prisma.ApplicationWhereInput = {};
-  if (filter.applicantId !== undefined) where.applicantId = filter.applicantId;
-  if (filter.status !== undefined) where.status = filter.status;
+
+  if (filter.applicantId !== undefined) {
+    where.applicantId = filter.applicantId;
+  }
+
+  if (filter.status !== undefined) {
+    where.status = filter.status;
+  }
+
   return where;
 };
 
@@ -72,8 +91,14 @@ const toMutation = (
     status: changes.status,
   };
 
-  if (changes.score !== undefined) data.score = changes.score;
-  if (changes.decidedAt !== undefined) data.decidedAt = changes.decidedAt;
+  if (changes.score !== undefined) {
+    data.score = changes.score;
+  }
+
+  if (changes.decidedAt !== undefined) {
+    data.decidedAt = changes.decidedAt;
+  }
+
   return data;
 };
 
@@ -105,8 +130,9 @@ const list = async (
 const updateStatus = (
   id: string,
   changes: StatusChange,
-): Promise<Application> => {
-  return prisma.$transaction(async (tx) => {
+  audit: AuditContext,
+): Promise<Application> =>
+  prisma.$transaction(async (tx) => {
     const current = await tx.application.findUniqueOrThrow({
       where: { id },
     });
@@ -125,12 +151,23 @@ const updateStatus = (
       data.decidedAt = changes.decidedAt;
     }
 
-    return tx.application.update({
+    const updated = await tx.application.update({
       where: { id },
       data,
     });
+
+    await tx.auditLogs.create({
+      data: {
+        applicationId: current.id,
+        actorId: audit.actorId,
+        fromStatus: current.status,
+        toStatus: changes.status,
+        reason: audit.reason,
+      },
+    });
+
+    return updated;
   });
-};
 
 const createWithOutbox = (
   data: CreateApplicationData,
@@ -138,65 +175,105 @@ const createWithOutbox = (
 ): Promise<Application> =>
   prisma.$transaction(async (tx) => {
     const row = await tx.application.create({ data });
-    await tx.outboxMessage.create({ data: event(row) });
+
+    await tx.outboxMessage.create({
+      data: event(row),
+    });
+
     return row;
   });
 
 const decideOnce = async (
   claim: EventClaim,
-  decide: (row: Application) => StatusChange,
+  decide: (row: Application) => Decision,
 ): Promise<DecisionResult> => {
   try {
-    return await prisma.$transaction(async (tx): Promise<DecisionResult> => {
-      await tx.processedEvent.create({
-        data: { messageId: claim.messageId, eventType: claim.eventType },
-      });
+    return await prisma.$transaction(
+      async (tx): Promise<DecisionResult> => {
+        await tx.processedEvent.create({
+          data: {
+            messageId: claim.messageId,
+            eventType: claim.eventType,
+          },
+        });
 
-      const row = await tx.application.findUnique({
-        where: { id: claim.applicationId },
-      });
+        const row = await tx.application.findUnique({
+          where: { id: claim.applicationId },
+        });
 
-      if (!row) return { outcome: "NOT_FOUND" };
+        if (!row) {
+          return { outcome: "NOT_FOUND" };
+        }
 
-      if (row.status !== "PENDING") {
-        return { outcome: "ALREADY_DECIDED", status: row.status };
-      }
+        if (row.status !== "PENDING") {
+          return {
+            outcome: "ALREADY_DECIDED",
+            status: row.status,
+          };
+        }
 
-      const changes = decide(row);
+        const changes = decide(row);
 
-      assertTransition(row.status, changes.status);
+        assertTransition(row.status, changes.status);
 
-      const { count } = await tx.application.updateMany({
-        where: {
-          id: row.id,
-          status: row.status,
-        },
-        data: toMutation(changes),
-      });
+        const { count } = await tx.application.updateMany({
+          where: {
+            id: row.id,
+            status: row.status,
+          },
+          data: toMutation(changes),
+        });
 
-      return count === 1 ? { outcome: "DECIDED" } : { outcome: "LOST_RACE" };
-    });
+        if (count !== 1) {
+          return { outcome: "LOST_RACE" };
+        }
+
+        await tx.auditLogs.create({
+          data: {
+            applicationId: row.id,
+            actorId: claim.actorId,
+            fromStatus: row.status,
+            toStatus: changes.status,
+            reason: changes.reason,
+          },
+        });
+
+        return { outcome: "DECIDED" };
+      },
+    );
   } catch (error) {
-    if (isDuplicateClaim(error)) return { outcome: "DUPLICATE" };
+    if (isDuplicateClaim(error)) {
+      return { outcome: "DUPLICATE" };
+    }
+
     throw error;
   }
 };
 
 export type ApplicationRepository = {
   create(data: CreateApplicationData): Promise<Application>;
+
   createWithOutbox(
     data: CreateApplicationData,
     event: (row: Application) => OutboxDraft,
   ): Promise<Application>;
+
   findById(id: string): Promise<Application | null>;
+
   list(
     filter: ApplicationFilter,
     page: PageRequest,
   ): Promise<Page<Application>>;
-  updateStatus(id: string, changes: StatusChange): Promise<Application>;
+
+  updateStatus(
+    id: string,
+    changes: StatusChange,
+    audit: AuditContext,
+  ): Promise<Application>;
+
   decideOnce(
     claim: EventClaim,
-    decide: (row: Application) => StatusChange,
+    decide: (row: Application) => Decision,
   ): Promise<DecisionResult>;
 };
 

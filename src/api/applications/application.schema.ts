@@ -18,3 +18,12 @@ export const listApplicationsQuerySchema = listQuerySchema.extend({
 });
 
 export type ListApplicationsQuery = z.infer<typeof listApplicationsQuerySchema>;
+
+export const updateApplicationStatusSchema = z.object({
+  status: z.enum(["IN_REVIEW", "APPROVED", "REJECTED"]),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export type UpdateApplicationStatusInput = z.infer<
+  typeof updateApplicationStatusSchema
+>;
