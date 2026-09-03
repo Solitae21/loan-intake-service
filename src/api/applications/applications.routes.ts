@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { requireAuth } from "../middleware/require-auth.js";
+import { requireAuth, requireRole } from "../middleware/require-auth.js";
 import { validate } from "../middleware/validate.js";
 import { AppError } from "../errors.js";
 import { idParamSchema } from "../schemas/common.js";
@@ -54,6 +54,21 @@ applicationRouter.patch(
     params: idParamSchema,
     body: updateApplicationStatusSchema,
   }),
+  async (req, res) => {
+    const application = await applicationService.transitionStatus(
+      actorOf(req),
+      req.params.id,
+      req.body,
+    );
+
+    res.json(application);
+  },
+);
+
+applicationRouter.patch(
+  "/:id/decision",
+  requireRole("OFFICER", "ADMIN"),
+  validate({ params: idParamSchema, body: updateApplicationStatusSchema }),
   async (req, res) => {
     const application = await applicationService.transitionStatus(
       actorOf(req),
