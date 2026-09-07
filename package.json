@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/api/server.ts",
     "start": "tsx src/api/server.ts",
-    "test": "vitest run",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:integration": "vitest run",
     "test:watch": "vitest",
     "prisma": "prisma --config src/prisma.config.ts",
     "prisma:format": "prisma format --config src/prisma.config.ts",

@@ -1,5 +1,21 @@
 # loan-intake-service
 
+## Tests
+
+Run `npm run test:unit` for the pure domain tests. These need no `.env.test`,
+database, or queue. They cover each scoring rule around its boundaries, score
+aggregation and decision thresholds, and every allowed and forbidden status transition.
+
+Run `npm run test:integration` for the API tests, which load `.env.test` and require
+the test PostgreSQL database. `npm test` runs both suites, starting with unit tests.
+For unit watch mode, run `npm run test:unit -- --watch`; `npm run test:watch`
+watches the integration tests.
+
+Application integration tests cover accepted submissions and their persisted outbox
+events, rejected validation (422), missing or invalid authentication (401), forbidden
+status/decision changes (403), and owner-only access between applicants (403).
+They exercise the Express app and real test database without starting the queue worker.
+
 ## Scoring
 
 Scoring is a list of pure rules in `src/domain/applications/scoring.rules.ts`. Each rule
