@@ -1,5 +1,11 @@
 # loan-intake-service
 
+## API documentation
+
+The hand-written OpenAPI specification is in `openapi.yaml`. With the API running,
+open `http://localhost:<PORT>/docs` for Swagger UI. Use **Authorize** to enter an
+access token, then requests to protected endpoints can be executed from the page.
+
 ## Tests
 
 Run `npm run test:unit` for the pure domain tests. These need no `.env.test`,
