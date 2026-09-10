@@ -33,7 +33,11 @@ const seesEveryApplication = (actor: AccessPayload): boolean =>
   actor.role !== "APPLICANT";
 
 export const createApplicationService = (repo: ApplicationRepository) => ({
-  submit: async (actor: AccessPayload, input: CreateApplicationInput) => {
+  submit: async (
+    actor: AccessPayload,
+    input: CreateApplicationInput,
+    requestId: string,
+  ) => {
     const row = await repo.createWithOutbox(
       {
         applicantId: actor.sub,
@@ -45,6 +49,7 @@ export const createApplicationService = (repo: ApplicationRepository) => ({
       (application) => ({
         exchange: LOANS_EXCHANGE,
         routingKey: APPLICATION_SUBMITTED,
+        correlationId: requestId,
         payload: {
           applicationId: application.id,
           occuredAt: application.createdAt.toISOString(),

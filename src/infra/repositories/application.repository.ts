@@ -7,6 +7,7 @@ import { prisma } from "../prisma.js";
 export type OutboxDraft = {
   exchange: string;
   routingKey: string;
+  correlationId?: string;
   payload: Prisma.InputJsonValue;
 };
 

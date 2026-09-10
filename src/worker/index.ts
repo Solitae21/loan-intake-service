@@ -58,33 +58,42 @@ const republish = (msg: ConsumeMessage, attempts: number): void => {
 const onMessage = async (msg: ConsumeMessage): Promise<void> => {
   const messageId = msg.properties.messageId;
   const attempts = priorAttempts(msg) + 1;
+  const messageLog = log.child({
+    handler: "application.submitted",
+    ...(messageId ? { messageId } : {}),
+    correlationId: msg.properties.correlationId ?? messageId ?? "unknown",
+  });
 
   if (!messageId) {
-    log.error("message has no messageId - cannot dedupe, dead lettering");
+    messageLog.error("message has no messageId - cannot dedupe, dead lettering");
     settle(() => channel.nack(msg, false, false));
     return;
   }
 
   try {
-    await handleSubmitted(messageId, JSON.parse(msg.content.toString()));
+    await handleSubmitted(
+      messageId,
+      JSON.parse(msg.content.toString()),
+      messageLog,
+    );
     settle(() => channel.ack(msg));
   } catch (err) {
     if (isPermanent(err)) {
-      log.error({ err, messageId }, "unprocessable message - dead lettering");
+      messageLog.error({ err }, "unprocessable message - dead lettering");
       settle(() => channel.nack(msg, false, false));
       return;
     }
 
     if (attempts >= MAX_ATTEMPTS) {
-      log.error(
-        { err, messageId, attempts },
+      messageLog.error(
+        { err, attempts },
         "retried exhausted - dead lettering",
       );
       settle(() => channel.nack(msg, false, false));
       return;
     }
 
-    log.warn({ err, messageId, attempts }, "scoring failed - retrying");
+    messageLog.warn({ err, attempts }, "scoring failed - retrying");
     settle(() => {
       republish(msg, attempts);
       channel.ack(msg);

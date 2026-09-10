@@ -7,11 +7,16 @@ import {
   refresh,
   register,
 } from "../../domain/auth/auth.service.js";
+import {
+  loginRateLimiter,
+  registerRateLimiter,
+} from "../middleware/auth-rate-limit.js";
 
 export const authRouter = Router();
 
 authRouter.post(
   "/register",
+  registerRateLimiter,
   validate({ body: credentialsSchema }),
   async (req, res) => {
     const user = await register(req.body);
@@ -21,6 +26,7 @@ authRouter.post(
 
 authRouter.post(
   "/login",
+  loginRateLimiter,
   validate({ body: credentialsSchema }),
   async (req, res) => {
     const { user, tokens } = await login(req.body);

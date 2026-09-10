@@ -12,6 +12,7 @@ type ClaimedMessage = {
   id: string;
   exchange: string;
   routingKey: string;
+  correlationId: string | null;
   payload: unknown;
   attempts: number;
 };
@@ -23,7 +24,7 @@ const drainOnce = (): Promise<number> =>
   prisma.$transaction(
     async (tx) => {
       const batch = await tx.$queryRaw<ClaimedMessage[]>`
-        SELECT "id", "exchange", "routingKey", "payload", "attempts"
+        SELECT "id", "exchange", "routingKey", "correlationId", "payload", "attempts"
         FROM "OutboxMessage"
         WHERE "publishedAt" IS NULL
           AND "availableAt" <= NOW()
@@ -35,12 +36,22 @@ const drainOnce = (): Promise<number> =>
       let published = 0;
 
       for (const message of batch) {
+        const messageLog = logger.child({
+          messageId: message.id,
+          ...(message.correlationId
+            ? { correlationId: message.correlationId }
+            : {}),
+        });
+
         try {
           await publish({
             exchange: message.exchange,
             routingKey: message.routingKey,
             body: message.payload,
             messageId: message.id,
+            ...(message.correlationId
+              ? { correlationId: message.correlationId }
+              : {}),
           });
 
           await tx.outboxMessage.update({
@@ -60,8 +71,8 @@ const drainOnce = (): Promise<number> =>
             },
           });
 
-          logger.error(
-            { err, messageId: message.id, attempts },
+          messageLog.error(
+            { err, attempts },
             attempts >= ALERT_AFTER_ATTEMPTS
               ? "outbox message is stuck - investigate"
               : "outbox publish failed, will retry",

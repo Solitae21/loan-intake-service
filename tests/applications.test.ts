@@ -26,8 +26,10 @@ async function expectNoSubmission() {
 describe("POST /applications", () => {
   it("accepts a submission and persists its application and outbox event", async () => {
     const applicant = await createApplicant();
+    const requestId = "submission-correlation-id";
     const response = await request(app)
       .post("/applications")
+      .set("x-request-id", requestId)
       .set("Authorization", `Bearer ${applicant.token}`)
       .send(validApplication);
 
@@ -52,6 +54,7 @@ describe("POST /applications", () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       routingKey: "application.submitted",
+      correlationId: requestId,
       payload: { applicationId: saved.id },
       publishedAt: null,
     });

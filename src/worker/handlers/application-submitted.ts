@@ -4,8 +4,9 @@ import { scoreApplication } from "../../domain/applications/scoring.js";
 import { config } from "../../infra/config.js";
 import { logger } from "../../infra/logger.js";
 import { applicationRepository } from "../../infra/repositories/application.repository.js";
+import type { Logger } from "pino";
 
-const log = logger.child({ handler: APPLICATION_SUBMITTED });
+const defaultLog = logger.child({ handler: APPLICATION_SUBMITTED });
 
 const SCORING_WORKER_ACTOR_ID = "worker:application-scoring";
 
@@ -17,6 +18,7 @@ const submittedEvent = z.object({
 export const handleSubmitted = async (
   messageId: string,
   raw: unknown,
+  log: Logger = defaultLog,
 ): Promise<void> => {
   const event = submittedEvent.parse(raw);
 

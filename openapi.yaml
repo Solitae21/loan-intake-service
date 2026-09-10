@@ -51,6 +51,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "422":
           $ref: "#/components/responses/ValidationError"
         "500":
@@ -78,6 +80,8 @@ paths:
           $ref: "#/components/responses/MalformedJson"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "422":
           $ref: "#/components/responses/ValidationError"
         "500":
@@ -369,6 +373,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: More than five attempts were made from this IP within fifteen minutes.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     InternalError:
       description: An unexpected server error occurred.
       content:
@@ -592,7 +602,7 @@ components:
       properties:
         code:
           type: string
-          enum: [NOT_FOUND, UNAUTHORIZED, FORBIDDEN, CONFLICT, VALIDATION_ERROR, INTERNAL_ERROR]
+          enum: [NOT_FOUND, UNAUTHORIZED, FORBIDDEN, CONFLICT, VALIDATION_ERROR, RATE_LIMIT_EXCEEDED, INTERNAL_ERROR]
         message:
           type: string
         details:

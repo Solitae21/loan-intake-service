@@ -28,6 +28,7 @@ await publish({
   routingKey: row.routingKey,
   body: row.payload,
   messageId: row.id,
+  ...(row.correlationId ? { correlationId: row.correlationId } : {}),
 });
 
 console.log(`replayed ${row.routingKey} messageId=${row.id}`);

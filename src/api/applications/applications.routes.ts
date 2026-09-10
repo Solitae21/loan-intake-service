@@ -24,7 +24,11 @@ applicationRouter.post(
   "/",
   validate({ body: createApplicationSchema }),
   async (req, res) => {
-    const application = await applicationService.submit(actorOf(req), req.body);
+    const application = await applicationService.submit(
+      actorOf(req),
+      req.body,
+      String(req.id),
+    );
     res
       .status(202)
       .location(`${req.baseUrl}/${application.id}`)

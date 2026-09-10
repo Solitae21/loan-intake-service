@@ -14,7 +14,13 @@ import { openApiDocument } from "./openapi.js";
 export const app = express();
 
 app.use(requestId);
-app.use(pinoHttp({ logger, genReqId: (req) => req.id }));
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req) => req.id,
+    customProps: (req) => ({ requestId: String(req.id) }),
+  }),
+);
 app.use(
   "/docs",
   helmet({ contentSecurityPolicy: false }),
