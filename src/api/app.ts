@@ -10,8 +10,11 @@ import { logger } from "../infra/logger.js";
 import { authRouter } from "./auth/auth.routes.js";
 import { applicationRouter } from "./applications/applications.routes.js";
 import { openApiDocument } from "./openapi.js";
+import { config } from "../infra/config.js";
 
 export const app = express();
+
+app.set("trust proxy", config.TRUST_PROXY_HOPS);
 
 app.use(requestId);
 app.use(
@@ -21,17 +24,25 @@ app.use(
     customProps: (req) => ({ requestId: String(req.id) }),
   }),
 );
+if (config.API_DOCS_ENABLED) {
+  app.use(
+    "/docs",
+    // Swagger UI requires inline assets. Keep this exception off by default in production.
+    helmet({ contentSecurityPolicy: false }),
+    swaggerUi.serve,
+    swaggerUi.setup(openApiDocument, {
+      customSiteTitle: "Loan Intake Service API",
+      swaggerOptions: { persistAuthorization: true },
+    }),
+  );
+}
+app.use(helmet());
 app.use(
-  "/docs",
-  helmet({ contentSecurityPolicy: false }),
-  swaggerUi.serve,
-  swaggerUi.setup(openApiDocument, {
-    customSiteTitle: "Loan Intake Service API",
-    swaggerOptions: { persistAuthorization: true },
+  cors({
+    origin: config.CORS_ORIGINS,
+    exposedHeaders: ["Location"],
   }),
 );
-app.use(helmet());
-app.use(cors({ exposedHeaders: ["Location"] }));
 app.use(express.json({ limit: "100kb" }));
 
 app.use("/auth", authRouter);

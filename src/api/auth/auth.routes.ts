@@ -14,6 +14,12 @@ import {
 
 export const authRouter = Router();
 
+// Tokens and credentials must not be retained by browsers or intermediary caches.
+authRouter.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 authRouter.post(
   "/register",
   registerRateLimiter,
